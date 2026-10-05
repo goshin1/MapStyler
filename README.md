@@ -27,19 +27,24 @@ npm run dev
 - 일반구가 있는 시는 시 단위 (수원시, 성남시, 창원시 등 13개)
 - 100% 판정은 반올림 전 값 `>= 100`
 
-## 배경 지도 파일 만들기 (인터넷 되는 PC에서 1회)
+## 배경 지도 파일 (`public/tiles/korea.pmtiles`)
 
-Docker (PowerShell):
+대한민국 전역, 줌 0~12, 약 45MB. git에 포함되어 있어 clone만 하면 바로 동작한다.
+(시도 단위 화면은 줌 11 전후라 12까지면 충분하고, 그 이상 확대해도 벡터라 선이 깨지지 않는다)
+
+지도를 갱신할 때만 다시 만든다 (인터넷 되는 PC, Docker, PowerShell):
 
 ```powershell
 mkdir data\tiles
 docker run --rm -e JAVA_TOOL_OPTIONS="-Xmx4g" -v ${PWD}\data\tiles:/data ghcr.io/onthegomap/planetiler:latest `
-  --download --area=south-korea --output=/data/korea.pmtiles `
+  --download --area=south-korea --maxzoom=12 --output=/data/korea.pmtiles `
   --exclude-layers=poi,housenumber,transportation_name,water_name,place,mountain_peak,aerodrome_label
 copy data\tiles\korea.pmtiles public\tiles\korea.pmtiles
 ```
 
-용량이 커서 git에는 올리지 않는다 (`.gitignore`). 지도를 갱신하고 싶을 때만 다시 만든다.
+- `data/tiles`(원본 다운로드 캐시, 약 1.6GB)는 git 제외
+- GitHub는 100MB 넘는 파일을 거부하므로 `--maxzoom`은 12 이하 유지
+- 지도 데이터 출처: © OpenStreetMap contributors, © OpenMapTiles
 
 ## 배포 (인터넷 없는 환경)
 

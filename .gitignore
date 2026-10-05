@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 Claude outputs
-# 배경 지도 PMTiles (용량이 커서 git 제외, README 참고)
+
+
+# 배경 지도 생성 중간 파일/원본(z14) — 앱이 쓰는 public/tiles/korea.pmtiles(z12, 약 45MB)만 git에 포함
 data/tiles/
-public/tiles/*.pmtiles
