@@ -6,16 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:geo": "node scripts/build-geo.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.12.0",
     "vue": "^3.5.42"
   },
   "devDependencies": {
+    "@turf/turf": "^7.4.0",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
+    "polylabel": "^2.1.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vue-tsc": "^3.3.11"
