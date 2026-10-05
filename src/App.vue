@@ -69,7 +69,13 @@ const sidoList = ref<SidoIndex[]>([])
 const config = ref<SidoConfig>(getSidoConfig(sido.value))
 const animation = ref<AnimationConfig>({ ...DEFAULT_ANIMATION })
 const autoplay = ref(true)
-const background = ref<BackgroundConfig>({ basemap: true, maskOpacity: 0.35 })
+const background = ref<BackgroundConfig>({ theme: 'dark', basemap: true, maskOpacity: 0.35 })
+// 리모컨/말풍선 등 화면 UI 색은 CSS 변수로 테마 전환 (src/style.css)
+watch(
+  () => background.value.theme,
+  (theme) => (document.documentElement.dataset.theme = theme),
+  { immediate: true },
+)
 const effects = ref<EffectConfig>({ ...DEFAULT_EFFECTS })
 const values = ref<RateInput>({})
 const geo = shallowRef<SidoGeo>()

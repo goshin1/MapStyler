@@ -1,6 +1,6 @@
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl'
 import type { SidoConfig } from '../types'
-import { BASEMAP_COLORS, LABEL_FONT } from './style'
+import { BASEMAP_THEMES, LABEL_FONT } from './style'
 import { paletteOf } from './color'
 
 export const SRC = {
@@ -28,6 +28,7 @@ export const LAYER = {
 } as const
 
 type Look = Pick<SidoConfig, 'color' | 'dimOpacity' | 'dimLightness'>
+type Theme = 'dark' | 'light'
 
 /** 0~99.9% 블록 색: 값이 낮을수록 더 연하게 (feature-state v) */
 export function dimColor(look: Look): ExpressionSpecification {
@@ -49,15 +50,15 @@ const LABEL_TEXT: ExpressionSpecification = [
 /** 블록 높이 (feature-state h) */
 const HEIGHT: ExpressionSpecification = ['coalesce', ['feature-state', 'h'], 0]
 
-export function createLayers(look: Look, maskOpacity = 0.35, glow = 0.7): LayerSpecification[] {
-  const p = paletteOf(look.color, look.dimLightness)
+export function createLayers(look: Look, maskOpacity = 0.35, glow = 0.7, theme: Theme = 'dark'): LayerSpecification[] {
+  const p = paletteOf(look.color, look.dimLightness, theme)
   return [
     // 시도 바깥 배경 지도를 어둡게 눌러 선택한 시도에 시선이 가도록
     {
       id: LAYER.mask,
       type: 'fill',
       source: SRC.mask,
-      paint: { 'fill-color': BASEMAP_COLORS.background, 'fill-opacity': maskOpacity },
+      paint: { 'fill-color': BASEMAP_THEMES[theme].background, 'fill-opacity': maskOpacity },
     },
     // 바닥: 시도 전체 면 (블록 사이 틈으로 보이는 색)
     {
@@ -135,7 +136,7 @@ export function createLayers(look: Look, maskOpacity = 0.35, glow = 0.7): LayerS
         'symbol-sort-key': ['-', 0, ['get', 'v']],
       },
       paint: {
-        'text-color': '#ffffff',
+        'text-color': p.labelText,
         'text-halo-color': p.labelHalo,
         'text-halo-width': 1.5,
         'text-halo-blur': 0.5,
@@ -159,8 +160,8 @@ export function createLayers(look: Look, maskOpacity = 0.35, glow = 0.7): LayerS
         'text-padding': 1,
       },
       paint: {
-        'text-color': '#ffffff',
-        'text-halo-color': p.labelHalo,
+        'text-color': p.peakLabelText,
+        'text-halo-color': p.peakLabelHalo,
         'text-halo-width': 2,
         'text-halo-blur': 0.5,
         'text-translate-anchor': 'viewport',
@@ -170,8 +171,11 @@ export function createLayers(look: Look, maskOpacity = 0.35, glow = 0.7): LayerS
 }
 
 /** 색 설정 변경 시 갱신할 paint 속성 */
-export function lookPaint(look: Look): [string, string, string | number | ExpressionSpecification][] {
-  const p = paletteOf(look.color, look.dimLightness)
+export function lookPaint(
+  look: Look,
+  theme: Theme = 'dark',
+): [string, string, string | number | ExpressionSpecification][] {
+  const p = paletteOf(look.color, look.dimLightness, theme)
   return [
     [LAYER.floor, 'fill-color', p.floor],
     [LAYER.floorLine, 'line-color', p.floorLine],
@@ -180,7 +184,10 @@ export function lookPaint(look: Look): [string, string, string | number | Expres
     [LAYER.peakGlow, 'line-color', p.glow],
     [LAYER.extrusion, 'fill-extrusion-color', dimColor(look)],
     [LAYER.extrusion, 'fill-extrusion-opacity', look.dimOpacity],
+    [LAYER.label, 'text-color', p.labelText],
     [LAYER.label, 'text-halo-color', p.labelHalo],
-    [LAYER.labelPeak, 'text-halo-color', p.labelHalo],
+    [LAYER.labelPeak, 'text-color', p.peakLabelText],
+    [LAYER.labelPeak, 'text-halo-color', p.peakLabelHalo],
+    [LAYER.mask, 'fill-color', BASEMAP_THEMES[theme].background],
   ]
 }

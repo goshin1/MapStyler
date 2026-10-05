@@ -53,8 +53,13 @@ export interface AnimationConfig {
   order: 'together' | 'ascending' | 'random'
 }
 
+/** 화면 테마 */
+export type Theme = 'dark' | 'light'
+
 /** 배경 지도 설정 */
 export interface BackgroundConfig {
+  /** 다크 / 화이트 테마 */
+  theme: Theme
   /** 도로/강 배경 지도 표시 */
   basemap: boolean
   /** 시도 바깥을 어둡게 누르는 정도 (0~1) */

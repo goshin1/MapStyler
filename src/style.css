@@ -5,8 +5,32 @@
   --text: #e6ebf5;
   --muted: #8a94a8;
   --accent: #ff2a2a;
+  --panel-bg: rgba(13, 20, 36, 0.92);
+  --input-bg: #0a1020;
+  --hover-line: #33456b;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --callout-bg: rgba(8, 11, 20, 0.9);
+  --callout-text: #ffffff;
+  --warn: #ffb020;
   color-scheme: dark;
   font-family: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
+}
+
+/* 화이트 테마 (App.vue 에서 <html data-theme="light">) */
+:root[data-theme='light'] {
+  --bg: #f2f4f7;
+  --panel: #ffffff;
+  --line: #d9dee6;
+  --text: #1b2232;
+  --muted: #667085;
+  --panel-bg: rgba(255, 255, 255, 0.94);
+  --input-bg: #f5f7fa;
+  --hover-line: #aab4c3;
+  --shadow: rgba(16, 24, 40, 0.12);
+  --callout-bg: rgba(255, 255, 255, 0.95);
+  --callout-text: #1b2232;
+  --warn: #b54708;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -33,7 +57,7 @@ html, body, #app {
   animation: callout-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
 }
 .peak-callout__box {
-  background: rgba(8, 11, 20, 0.9);
+  background: var(--callout-bg);
   border: 1px solid var(--callout-color);
   border-radius: 6px;
   padding: 6px 14px 7px;
@@ -49,14 +73,13 @@ html, body, #app {
   gap: 6px;
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--callout-text);
 }
 .peak-callout__title svg {
   color: var(--callout-color);
 }
 .peak-callout__title b {
   color: var(--callout-color);
-  filter: brightness(1.25);
 }
 .peak-callout__sub {
   margin-top: 2px;

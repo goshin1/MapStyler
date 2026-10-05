@@ -19,10 +19,14 @@
       <!-- 배경 -->
       <section>
         <h3>배경 지도</h3>
+        <div class="segmented">
+          <button :class="{ on: background.theme === 'dark' }" @click="background.theme = 'dark'">다크</button>
+          <button :class="{ on: background.theme === 'light' }" @click="background.theme = 'light'">화이트</button>
+        </div>
         <label class="check"><input v-model="background.basemap" type="checkbox" /> 도로/강 배경 표시</label>
         <Slider
           v-model="background.maskOpacity"
-          label="시도 바깥 어둡게"
+          :label="background.theme === 'light' ? '시도 바깥 흐리게' : '시도 바깥 어둡게'"
           :min="0"
           :max="1"
           :step="0.05"
@@ -246,12 +250,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
-  background: rgba(13, 20, 36, 0.92);
+  background: var(--panel-bg);
   border: 1px solid var(--line);
   border-radius: 10px;
   backdrop-filter: blur(6px);
   font-size: 13px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 30px var(--shadow);
 }
 .remocon.collapsed {
   width: auto;
@@ -302,7 +306,7 @@ select,
 button,
 input[type='number'],
 textarea {
-  background: #0a1020;
+  background: var(--input-bg);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -316,7 +320,7 @@ button {
   cursor: pointer;
 }
 button:hover {
-  border-color: #33456b;
+  border-color: var(--hover-line);
 }
 button.primary {
   background: var(--accent);
@@ -340,6 +344,24 @@ input[type='color'] {
   background: transparent;
   padding: 0 2px;
 }
+.segmented {
+  display: flex;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.segmented button {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.segmented button.on {
+  background: var(--accent);
+  color: #fff;
+}
 .swatches {
   display: flex;
   gap: 6px;
@@ -353,7 +375,7 @@ input[type='color'] {
   border: 2px solid transparent;
 }
 .swatch.on {
-  border-color: #fff;
+  border-color: var(--text);
 }
 .buttons {
   display: flex;
@@ -377,7 +399,7 @@ input[type='color'] {
 input.text {
   flex: 1;
   min-width: 0;
-  background: #0a1020;
+  background: var(--input-bg);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -390,7 +412,7 @@ input.text {
   color: var(--muted);
 }
 .warn {
-  color: #ffb020;
+  color: var(--warn);
   font-size: 12px;
   margin: 6px 0 0;
 }
@@ -408,7 +430,7 @@ input.text {
   border-radius: 4px;
 }
 .sgg-list li.peak {
-  background: rgba(255, 42, 42, 0.15);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 .sgg-list .name {
   overflow: hidden;

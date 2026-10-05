@@ -58,7 +58,7 @@ label {
 }
 input[type='number'] {
   width: 72px;
-  background: #0a1020;
+  background: var(--input-bg);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 6px;

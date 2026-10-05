@@ -10,9 +10,6 @@
       >
         <div class="peak-summary__box">
           <div class="peak-summary__title">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path fill="currentColor" d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7zm2.6 13h12.8v1.6H5.6z" />
-            </svg>
             <span>{{ summary.title }}</span>
           </div>
           <div class="peak-summary__names">{{ summary.names }}</div>
@@ -27,7 +24,7 @@ import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Map, type GeoJSONSource, type PaddingOptions } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
 import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, RateInput } from '../types'
-import { BASEMAP_LAYER_IDS, BASEMAP_SOURCE, BASEMAP_URL, basemapLayers, createBaseStyle } from '../map/style'
+import { BASEMAP_LAYER_IDS, BASEMAP_SOURCE, BASEMAP_THEMES, BASEMAP_URL, basemapLayers, createBaseStyle } from '../map/style'
 import { createMask } from '../map/mask'
 import { CalloutManager, type CalloutItem } from '../map/callout'
 import { createLayers, LAYER, lookPaint, SRC } from '../map/layers'
@@ -62,7 +59,7 @@ const props = withDefaults(
     autoplay: true,
     pitch: 45,
     padding: () => ({ top: 60, bottom: 60, left: 60, right: 60 }),
-    background: () => ({ basemap: true, maskOpacity: 0.35 }),
+    background: () => ({ theme: 'dark', basemap: true, maskOpacity: 0.35 }),
     effects: () => ({ ...DEFAULT_EFFECTS }),
   },
 )
@@ -358,10 +355,24 @@ function addBasemap(m: Map) {
   if (!BASEMAP_URL) return
   try {
     m.addSource(BASEMAP_SOURCE, { type: 'vector', url: BASEMAP_URL })
-    for (const layer of basemapLayers()) m.addLayer(layer, LAYER.mask)
+    for (const layer of basemapLayers(props.background.theme)) m.addLayer(layer, LAYER.mask)
   } catch (e) {
     console.error('[map] 배경 지도를 붙이지 못했습니다', e)
   }
+}
+
+/** 다크/화이트 테마 전환: 배경, 배경 지도, 시도 레이어 색을 모두 바꾼다 */
+function applyTheme() {
+  const m = map.value
+  if (!m?.getLayer(LAYER.extrusion)) return
+  const theme = props.background.theme
+  m.setPaintProperty('background', 'background-color', BASEMAP_THEMES[theme].background)
+  for (const layer of basemapLayers(theme)) {
+    if (!m.getLayer(layer.id) || !('paint' in layer) || !layer.paint) continue
+    for (const [prop, value] of Object.entries(layer.paint))
+      m.setPaintProperty(layer.id, prop as Parameters<Map['setPaintProperty']>[1], value)
+  }
+  applyLook()
 }
 
 /** 배경 지도 켜기/끄기, 바깥 어둡게 */
@@ -376,7 +387,7 @@ function applyBackground() {
 function applyLook() {
   const m = map.value
   if (!m?.getLayer(LAYER.extrusion)) return
-  for (const [layer, prop, value] of lookPaint(props.config))
+  for (const [layer, prop, value] of lookPaint(props.config, props.background.theme))
     m.setPaintProperty(layer, prop as Parameters<Map['setPaintProperty']>[1], value)
   updateCallouts(animator.frames)
 }
@@ -384,7 +395,7 @@ function applyLook() {
 onMounted(() => {
   const m = new Map({
     container: container.value!,
-    style: createBaseStyle(),
+    style: createBaseStyle(props.background.theme),
     center: [127.8, 36.2],
     zoom: 6,
     pitch: props.pitch,
@@ -404,7 +415,8 @@ onMounted(() => {
     m.addSource(SRC.outline, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.sgg, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.labels, { type: 'geojson', data: EMPTY })
-    for (const layer of createLayers(props.config, props.background.maskOpacity, props.effects.glow)) m.addLayer(layer)
+    for (const layer of createLayers(props.config, props.background.maskOpacity, props.effects.glow, props.background.theme))
+      m.addLayer(layer)
     callouts = new CalloutManager(m)
     addBasemap(m)
     applyBackground()
@@ -435,6 +447,7 @@ watch(
 )
 watch(() => [props.config.color, props.config.dimOpacity, props.config.dimLightness], applyLook)
 watch(() => props.background, applyBackground, { deep: true })
+watch(() => props.background.theme, applyTheme)
 watch(() => props.effects, applyEffects, { deep: true })
 watch(
   () => props.padding,
@@ -471,7 +484,7 @@ defineExpose({ map, geo, fitView, play, reset, showNow })
   z-index: 1;
 }
 .peak-summary__box {
-  background: rgba(8, 11, 20, 0.9);
+  background: var(--callout-bg);
   border: 1px solid var(--callout-color);
   border-radius: 8px;
   padding: 10px 20px 11px;
@@ -488,7 +501,7 @@ defineExpose({ map, geo, fitView, play, reset, showNow })
   gap: 8px;
   font-size: 18px;
   font-weight: 700;
-  color: #fff;
+  color: var(--callout-text);
 }
 .peak-summary__title svg {
   color: var(--callout-color);

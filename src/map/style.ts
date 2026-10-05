@@ -1,4 +1,5 @@
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl'
+import type { Theme } from '../types'
 
 /**
  * 배경 지도(베이스맵) 스타일
@@ -17,20 +18,37 @@ export const BASEMAP_URL: string = import.meta.env.VITE_BASEMAP_URL ?? LOCAL_BAS
 
 export const BASEMAP_SOURCE = 'basemap'
 
-/** 배경 지도 색 (시안 톤: 남색 계열 검정 + 저채도 회청색 도로 + 진한 남색 강) */
-export const BASEMAP_COLORS = {
-  background: '#070b14',
-  park: '#0c1526',
-  water: '#0f2547',
-  waterLine: '#1a3560',
-  road: {
-    motorway: '#3a4c72',
-    major: '#2c3a59',
-    minor: '#1d2740',
-    rail: '#243050',
+/** 배경 지도 색 (테마별) */
+export const BASEMAP_THEMES = {
+  /** 시안 톤: 남색 계열 검정 + 저채도 회청색 도로 + 진한 남색 강 */
+  dark: {
+    background: '#070b14',
+    park: '#0c1526',
+    water: '#0f2547',
+    waterLine: '#1a3560',
+    road: {
+      motorway: '#3a4c72',
+      major: '#2c3a59',
+      minor: '#1d2740',
+      rail: '#243050',
+    },
+    building: '#121a2e',
   },
-  building: '#121a2e',
-}
+  /** 밝은 회백색 바탕 + 연회색 도로 + 연하늘색 강 */
+  light: {
+    background: '#f2f4f7',
+    park: '#e2ebdd',
+    water: '#c7d9ee',
+    waterLine: '#b0c9e6',
+    road: {
+      motorway: '#bfc7d3',
+      major: '#cfd5de',
+      minor: '#dfe3e9',
+      rail: '#cdd3dc',
+    },
+    building: '#e4e7ec',
+  },
+} satisfies Record<Theme, unknown>
 
 /** 줌에 따른 선 굵기 */
 const width = (z8: number, z12: number, z16: number): ExpressionSpecification => [
@@ -47,8 +65,8 @@ const width = (z8: number, z12: number, z16: number): ExpressionSpecification =>
 
 const notTunnel: ExpressionSpecification = ['!=', ['get', 'brunnel'], 'tunnel']
 
-export function basemapLayers(): LayerSpecification[] {
-  const c = BASEMAP_COLORS
+export function basemapLayers(theme: Theme = 'dark'): LayerSpecification[] {
+  const c = BASEMAP_THEMES[theme]
   const src = BASEMAP_SOURCE
   return [
     {
@@ -142,7 +160,7 @@ export const BASEMAP_LAYER_IDS = basemapLayers().map((l) => l.id)
  * 배경 지도는 지도 로드 후 addBasemap()으로 따로 붙인다
  * → 배경 지도 파일이 없거나 깨져도 시군구 3D 지도는 정상 동작.
  */
-export function createBaseStyle(): StyleSpecification {
+export function createBaseStyle(theme: Theme = 'dark'): StyleSpecification {
   return {
     version: 8,
     sources: {},
@@ -150,7 +168,7 @@ export function createBaseStyle(): StyleSpecification {
       {
         id: 'background',
         type: 'background',
-        paint: { 'background-color': BASEMAP_COLORS.background },
+        paint: { 'background-color': BASEMAP_THEMES[theme].background },
       },
     ],
     light: {
