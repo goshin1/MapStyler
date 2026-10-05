@@ -1,7 +1,15 @@
 <template>
   <div class="app">
     <div class="map">
-      <MapView :sido="sido" :values="values" :config="config" @loaded="onLoaded" @matched="onMatched" />
+      <MapView
+        ref="mapView"
+        :sido="sido"
+        :values="values"
+        :config="config"
+        :animation="animation"
+        @loaded="onLoaded"
+        @matched="onMatched"
+      />
     </div>
     <div class="map-remocon">
       <!-- 지도 애니메이션 컨트롤 (5단계: MapRemocon.vue) — 지금은 임시 컨트롤 -->
@@ -9,6 +17,13 @@
         <option v-for="s in sidoList" :key="s.sido" :value="s.sido">{{ s.sidonm }}</option>
       </select>
       <button @click="randomize">임의 값</button>
+      <select v-model="animation.order">
+        <option value="ascending">낮은 값부터</option>
+        <option value="together">동시</option>
+        <option value="random">무작위</option>
+      </select>
+      <button @click="mapView?.play()">재생</button>
+      <button @click="mapView?.reset()">리셋</button>
       <div v-if="matchInfo" class="info">{{ matchInfo }}</div>
     </div>
   </div>
@@ -32,11 +47,12 @@
 7. 연출 다듬기   : 글로우, 하이라이트, 1위 강조
 8. 배포 준비     : PMTiles 자체 호스팅, 빌드 검증
 */
-import { onMounted, ref, shallowRef, watch } from 'vue'
+import { onMounted, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import MapView from './components/MapView.vue'
 import type { SidoGeo, TurnoutInput } from './types'
 import { getSidoConfig } from './config/sido'
 import { mockTurnout, type MatchResult } from './composables/useTurnout'
+import { DEFAULT_ANIMATION } from './map/animator'
 
 interface SidoIndex {
   sido: string
@@ -51,6 +67,8 @@ const config = ref(getSidoConfig(sido.value))
 const values = ref<TurnoutInput>({})
 const geo = shallowRef<SidoGeo>()
 const matchInfo = ref('')
+const animation = reactive({ ...DEFAULT_ANIMATION })
+const mapView = useTemplateRef('mapView')
 
 watch(sido, (code) => (config.value = getSidoConfig(code)))
 

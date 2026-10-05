@@ -6,9 +6,10 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Map, type GeoJSONSource } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
-import type { SidoConfig, SidoGeo, TurnoutInput } from '../types'
+import type { AnimationConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
 import { BASE_STYLE } from '../map/style'
 import { colorPaint, createLayers, LAYER, SRC } from '../map/layers'
+import { createAnimator, DEFAULT_ANIMATION, easeOutBack, type Frames } from '../map/animator'
 import { formatPct, heightOf, isPeak, matchTurnout, type MatchResult } from '../composables/useTurnout'
 
 const props = withDefaults(
@@ -19,15 +20,20 @@ const props = withDefaults(
     values?: TurnoutInput
     /** 높이/색 설정 */
     config: SidoConfig
+    /** 차오름 애니메이션 설정 */
+    animation?: AnimationConfig
+    /** 값이 바뀌면 현재 상태에서 새 값까지 자동으로 애니메이션 */
+    autoplay?: boolean
     /** 카메라 기울기 (도) */
     pitch?: number
   }>(),
-  { values: () => ({}), pitch: 45 },
+  { values: () => ({}), animation: () => ({ ...DEFAULT_ANIMATION }), autoplay: true, pitch: 45 },
 )
 
 const emit = defineEmits<{
   (e: 'loaded', geo: SidoGeo): void
   (e: 'matched', result: MatchResult): void
+  (e: 'animationend'): void
 }>()
 
 const container = ref<HTMLDivElement>()
@@ -36,9 +42,16 @@ const geo = shallowRef<SidoGeo>()
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
-/** 라벨 보정용 높이(m): 일반 라벨은 평균 높이, 100% 라벨은 peakHeight */
+/** 매칭된 목표 값 (시군구 key → 값, 값 없으면 undefined) */
+let targets: Record<string, number | undefined> = {}
+/** 라벨 보정용 높이(m): 일반 라벨은 현재 평균 높이, 100% 라벨은 현재 100% 블록 높이 */
 let labelHeight = 0
 let peakLabelHeight = 0
+/** 라벨 setData 최소 간격(ms) — 매 프레임 갱신하면 워커 부하가 커서 제한 */
+const LABEL_INTERVAL = 50
+let lastLabelAt = 0
+
+const animator = createAnimator((frames) => render(frames))
 
 async function loadSido(code: string): Promise<SidoGeo> {
   const res = await fetch(`${import.meta.env.BASE_URL}geo/${code}.json`)
@@ -75,54 +88,104 @@ function liftLabels() {
   m.setPaintProperty(LAYER.labelPeak, 'text-translate', [0, -peakLabelHeight * k])
 }
 
-/** 값 → feature-state(h, v, peak) + 라벨 데이터 갱신 */
-function applyValues() {
+/** 표시 상태(frames) → 블록 feature-state + 라벨 */
+function render(frames: Frames, forceLabels = false) {
   const m = map.value
   const g = geo.value
   if (!m || !g) return
-  const result = matchTurnout(props.values, g)
   const cfg = props.config
+  const top = heightOf(99.999, cfg)
 
-  const heights: number[] = []
+  // 라벨 높이도 블록이 차오르는 만큼 따라 올라가도록 현재 높이로 계산
+  let sum = 0
+  let count = 0
+  let peakH = 0
   for (const f of g.sgg.features) {
-    const v = result.values[f.properties.key]
-    const has = v !== undefined
-    const h = has ? heightOf(v, cfg) : heightOf(0, cfg)
-    if (has && !isPeak(v)) heights.push(h)
-    m.setFeatureState({ source: SRC.sgg, id: f.id! }, { v: v ?? 0, h, peak: has && isPeak(v) })
+    const fr = frames[f.properties.key] ?? { v: 0, peak: 0 }
+    const h = fr.peak > 0 ? top + (cfg.peakHeight - top) * easeOutBack(fr.peak) : heightOf(fr.v, cfg)
+    m.setFeatureState({ source: SRC.sgg, id: f.id! }, { v: fr.v, h, peak: fr.peak > 0 })
+    if (fr.peak > 0) peakH = Math.max(peakH, h)
+    else if (targets[f.properties.key] !== undefined) {
+      sum += h
+      count++
+    }
   }
-  labelHeight = heights.length ? heights.reduce((a, b) => a + b, 0) / heights.length : heightOf(0, cfg)
-  peakLabelHeight = cfg.peakHeight
+  labelHeight = count ? sum / count : heightOf(0, cfg)
+  peakLabelHeight = peakH || cfg.peakHeight
+  liftLabels()
 
+  const now = performance.now()
+  if (!forceLabels && now - lastLabelAt < LABEL_INTERVAL) return
+  lastLabelAt = now
   const labels: FeatureCollection = {
     type: 'FeatureCollection',
     features: g.labels.features.map((f) => {
-      const v = result.values[f.properties.key]
+      const key = f.properties.key
+      const fr = frames[key] ?? { v: 0, peak: 0 }
+      const has = targets[key] !== undefined
       return {
         ...f,
         properties: {
           ...f.properties,
-          v: v ?? -1,
-          pct: v === undefined ? '-' : formatPct(v),
-          peak: v !== undefined && isPeak(v),
+          v: has ? (targets[key] as number) : -1,
+          pct: !has ? '-' : fr.peak > 0 ? formatPct(100) : formatPct(Math.min(fr.v, 99.9)),
+          peak: fr.peak > 0,
         },
       }
     }),
   }
   ;(m.getSource(SRC.labels) as GeoJSONSource).setData(labels)
-  liftLabels()
+}
+
+/** 서버 값 매칭 → 목표 값/라벨 높이 계산 */
+function updateTargets() {
+  const g = geo.value
+  if (!g) return
+  const result = matchTurnout(props.values, g)
+  targets = {}
+  for (const f of g.sgg.features) targets[f.properties.key] = result.values[f.properties.key]
   emit('matched', result)
+}
+
+/** 애니메이션 실행. fromZero면 0부터 다시 */
+async function play(fromZero = true) {
+  updateTargets()
+  const cfg = props.animation
+  if (cfg.duration <= 0) {
+    animator.set(targets, isPeak)
+    render(animator.frames, true)
+  } else {
+    await animator.animateTo(targets, cfg, isPeak, fromZero)
+    render(animator.frames, true)
+  }
+  emit('animationend')
+}
+
+/** 모두 0으로 (블록은 최소 높이) */
+function reset() {
+  updateTargets()
+  const zero = Object.fromEntries(Object.keys(targets).map((k) => [k, 0]))
+  animator.set(zero, () => false)
+  render(animator.frames, true)
+}
+
+/** 애니메이션 없이 목표 값 즉시 표시 */
+function showNow() {
+  updateTargets()
+  animator.set(targets, isPeak)
+  render(animator.frames, true)
 }
 
 async function applySido(code: string) {
   const m = map.value
   if (!m) return
+  animator.stop()
   const g = await loadSido(code)
   geo.value = g
   m.removeFeatureState({ source: SRC.sgg })
   ;(m.getSource(SRC.outline) as GeoJSONSource).setData(g.outline)
   ;(m.getSource(SRC.sgg) as GeoJSONSource).setData(g.sgg)
-  applyValues()
+  reset()
   fitView()
   emit('loaded', g)
 }
@@ -130,7 +193,8 @@ async function applySido(code: string) {
 function applyColor(color: string) {
   const m = map.value
   if (!m?.getLayer(LAYER.extrusion)) return
-  for (const [layer, prop, value] of colorPaint(color)) m.setPaintProperty(layer, prop as Parameters<Map['setPaintProperty']>[1], value)
+  for (const [layer, prop, value] of colorPaint(color))
+    m.setPaintProperty(layer, prop as Parameters<Map['setPaintProperty']>[1], value)
 }
 
 onMounted(() => {
@@ -141,6 +205,8 @@ onMounted(() => {
     zoom: 6,
     pitch: props.pitch,
     maxPitch: 60,
+    // 라벨을 자주 갱신하므로 페이드 효과를 끈다 (깜빡임 방지)
+    fadeDuration: 0,
     attributionControl: false,
     canvasContextAttributes: { antialias: true },
   })
@@ -161,10 +227,19 @@ watch(
   () => props.sido,
   (code) => applySido(code),
 )
-watch(() => props.values, applyValues, { deep: true })
+// 값 변경: 현재 표시 상태에서 새 값으로 이어서 애니메이션
+watch(
+  () => props.values,
+  () => (props.autoplay ? play(false) : showNow()),
+  { deep: true },
+)
+// 높이 설정 변경: 즉시 반영
 watch(
   () => [props.config.maxHeight, props.config.peakHeight],
-  applyValues,
+  () => {
+    updateTargets()
+    render(animator.frames, true)
+  },
 )
 watch(() => props.config.color, applyColor)
 watch(
@@ -172,9 +247,12 @@ watch(
   (pitch) => map.value?.easeTo({ pitch, duration: 600 }),
 )
 
-onBeforeUnmount(() => map.value?.remove())
+onBeforeUnmount(() => {
+  animator.stop()
+  map.value?.remove()
+})
 
-defineExpose({ map, geo, fitView })
+defineExpose({ map, geo, fitView, play, reset, showNow })
 </script>
 
 <style scoped>

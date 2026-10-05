@@ -36,3 +36,15 @@ export interface SidoConfig {
   /** 메인 색상 */
   color: string
 }
+
+/** 차오름 애니메이션 설정 */
+export interface AnimationConfig {
+  /** 한 시군구가 목표 값까지 차오르는 시간(ms) */
+  duration: number
+  /** 순차 모드에서 시군구 사이 시작 간격(ms) */
+  stagger: number
+  /** 100% 도달 후 peakHeight까지 솟는 시간(ms) */
+  peakDuration: number
+  /** together: 동시 / ascending: 낮은 값부터(100%가 마지막) / random: 무작위 순서 */
+  order: 'together' | 'ascending' | 'random'
+}
