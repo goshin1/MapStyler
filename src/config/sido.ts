@@ -8,27 +8,30 @@ import type { SidoConfig } from '../types'
  */
 export const DEFAULT_COLOR = '#e3141c'
 
+/** 기본 색 표현: 100%는 메인 색 그대로, 0~99.9%는 연하게 + 반투명 */
+export const DEFAULT_LOOK = { color: DEFAULT_COLOR, dimOpacity: 0.78, dimLightness: 0.35 }
+
 export const SIDO_CONFIG: Record<string, SidoConfig> = {
-  '11': { maxHeight: 600, peakHeight: 950, color: DEFAULT_COLOR }, // 서울
-  '26': { maxHeight: 900, peakHeight: 1400, color: DEFAULT_COLOR }, // 부산
-  '27': { maxHeight: 1100, peakHeight: 1700, color: DEFAULT_COLOR }, // 대구
-  '28': { maxHeight: 1800, peakHeight: 2800, color: DEFAULT_COLOR }, // 인천
-  '30': { maxHeight: 600, peakHeight: 950, color: DEFAULT_COLOR }, // 대전
-  '31': { maxHeight: 900, peakHeight: 1400, color: DEFAULT_COLOR }, // 울산
-  '36': { maxHeight: 600, peakHeight: 950, color: DEFAULT_COLOR }, // 세종
-  '41': { maxHeight: 2400, peakHeight: 3700, color: DEFAULT_COLOR }, // 경기
-  '43': { maxHeight: 2400, peakHeight: 3700, color: DEFAULT_COLOR }, // 충북
-  '44': { maxHeight: 2400, peakHeight: 3700, color: DEFAULT_COLOR }, // 충남
-  '47': { maxHeight: 3000, peakHeight: 4600, color: DEFAULT_COLOR }, // 경북
-  '48': { maxHeight: 2600, peakHeight: 4000, color: DEFAULT_COLOR }, // 경남
-  '50': { maxHeight: 1400, peakHeight: 2200, color: DEFAULT_COLOR }, // 제주
-  '51': { maxHeight: 3000, peakHeight: 4600, color: DEFAULT_COLOR }, // 강원
-  '52': { maxHeight: 2400, peakHeight: 3700, color: DEFAULT_COLOR }, // 전북
-  '12': { maxHeight: 3000, peakHeight: 4600, color: DEFAULT_COLOR }, // 전남광주
+  '11': { maxHeight: 600, peakHeight: 950, ...DEFAULT_LOOK }, // 서울
+  '26': { maxHeight: 900, peakHeight: 1400, ...DEFAULT_LOOK }, // 부산
+  '27': { maxHeight: 1100, peakHeight: 1700, ...DEFAULT_LOOK }, // 대구
+  '28': { maxHeight: 1800, peakHeight: 2800, ...DEFAULT_LOOK }, // 인천
+  '30': { maxHeight: 600, peakHeight: 950, ...DEFAULT_LOOK }, // 대전
+  '31': { maxHeight: 900, peakHeight: 1400, ...DEFAULT_LOOK }, // 울산
+  '36': { maxHeight: 600, peakHeight: 950, ...DEFAULT_LOOK }, // 세종
+  '41': { maxHeight: 2400, peakHeight: 3700, ...DEFAULT_LOOK }, // 경기
+  '43': { maxHeight: 2400, peakHeight: 3700, ...DEFAULT_LOOK }, // 충북
+  '44': { maxHeight: 2400, peakHeight: 3700, ...DEFAULT_LOOK }, // 충남
+  '47': { maxHeight: 3000, peakHeight: 4600, ...DEFAULT_LOOK }, // 경북
+  '48': { maxHeight: 2600, peakHeight: 4000, ...DEFAULT_LOOK }, // 경남
+  '50': { maxHeight: 1400, peakHeight: 2200, ...DEFAULT_LOOK }, // 제주
+  '51': { maxHeight: 3000, peakHeight: 4600, ...DEFAULT_LOOK }, // 강원
+  '52': { maxHeight: 2400, peakHeight: 3700, ...DEFAULT_LOOK }, // 전북
+  '12': { maxHeight: 3000, peakHeight: 4600, ...DEFAULT_LOOK }, // 전남광주
 }
 
 export function getSidoConfig(sido: string): SidoConfig {
-  return { ...(SIDO_CONFIG[sido] ?? { maxHeight: 1500, peakHeight: 2300, color: DEFAULT_COLOR }) }
+  return { ...(SIDO_CONFIG[sido] ?? { maxHeight: 1500, peakHeight: 2300, ...DEFAULT_LOOK }) }
 }
 
 /** 0% 블록도 형태가 보이도록 깔아 두는 최소 높이 비율 (maxHeight 기준) */

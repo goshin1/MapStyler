@@ -12,12 +12,16 @@ function parse(hex: string): number[] {
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16))
 }
 
-/** 메인 색상에서 파생되는 팔레트 */
-export function paletteOf(main: string) {
+/**
+ * 메인 색상에서 파생되는 팔레트
+ * - peak: 100% → 메인 색 그대로 (원색)
+ * - dimLow ~ dimHigh: 0% ~ 99.9% → 메인 색을 흰색 쪽으로 연하게 (값이 낮을수록 더 연함)
+ */
+export function paletteOf(main: string, dimLightness = 0.35) {
   return {
-    low: mix(main, '#000000', 0.55), // 0%
-    main, // 99.9%
-    peak: mix(main, '#ffffff', 0.28), // 100%
+    peak: main,
+    dimHigh: mix(main, '#ffffff', dimLightness),
+    dimLow: mix(main, '#ffffff', Math.min(0.85, dimLightness + 0.3)),
     floor: mix(main, '#000000', 0.88),
     floorLine: mix(main, '#ffffff', 0.15),
     labelHalo: mix(main, '#000000', 0.75),

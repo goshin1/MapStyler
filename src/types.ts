@@ -33,8 +33,12 @@ export interface SidoConfig {
   maxHeight: number
   /** 100%일 때 높이(m) */
   peakHeight: number
-  /** 메인 색상 */
+  /** 메인 색상 — 100%일 때 이 색 그대로 */
   color: string
+  /** 0~99.9% 블록 불투명도 (0~1). 100% 블록은 항상 1 */
+  dimOpacity: number
+  /** 0~99.9% 블록을 메인 색보다 얼마나 연하게 할지 (0~1, 클수록 연함) */
+  dimLightness: number
 }
 
 /** 차오름 애니메이션 설정 */

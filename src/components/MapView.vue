@@ -4,11 +4,11 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { Map, type GeoJSONSource } from 'maplibre-gl'
+import { Map, type GeoJSONSource, type PaddingOptions } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
 import type { AnimationConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
 import { BASE_STYLE } from '../map/style'
-import { colorPaint, createLayers, LAYER, SRC } from '../map/layers'
+import { createLayers, LAYER, lookPaint, SRC } from '../map/layers'
 import { createAnimator, DEFAULT_ANIMATION, easeOutBack, type Frames } from '../map/animator'
 import { formatPct, heightOf, isPeak, matchTurnout, type MatchResult } from '../composables/useTurnout'
 
@@ -26,8 +26,16 @@ const props = withDefaults(
     autoplay?: boolean
     /** 카메라 기울기 (도) */
     pitch?: number
+    /** 시도를 화면에 맞출 때 여백(px) — 리모컨 패널이 가리는 영역 제외용 */
+    padding?: PaddingOptions
   }>(),
-  { values: () => ({}), animation: () => ({ ...DEFAULT_ANIMATION }), autoplay: true, pitch: 45 },
+  {
+    values: () => ({}),
+    animation: () => ({ ...DEFAULT_ANIMATION }),
+    autoplay: true,
+    pitch: 45,
+    padding: () => ({ top: 60, bottom: 60, left: 60, right: 60 }),
+  },
 )
 
 const emit = defineEmits<{
@@ -70,7 +78,7 @@ function fitView(animate = true) {
       [w, s],
       [e, n],
     ],
-    { padding: 60, pitch: props.pitch, bearing: 0, duration: animate ? 1200 : 0 },
+    { padding: props.padding, pitch: props.pitch, bearing: 0, duration: animate ? 1200 : 0 },
   )
 }
 
@@ -110,6 +118,7 @@ function render(frames: Frames, forceLabels = false) {
       count++
     }
   }
+  updatePeakSource(frames)
   labelHeight = count ? sum / count : heightOf(0, cfg)
   peakLabelHeight = peakH || cfg.peakHeight
   liftLabels()
@@ -135,6 +144,28 @@ function render(frames: Frames, forceLabels = false) {
     }),
   }
   ;(m.getSource(SRC.labels) as GeoJSONSource).setData(labels)
+}
+
+/**
+ * 100% 블록은 별도 레이어(불투명)로 그리므로 소스 속성 peak가 필요하다.
+ * (레이어 필터는 feature-state를 못 쓰기 때문) 100% 상태가 바뀔 때만 setData.
+ */
+let peakSignature = ''
+function updatePeakSource(frames: Frames, force = false) {
+  const m = map.value
+  const g = geo.value
+  if (!m || !g) return
+  const sig = g.sgg.features
+    .filter((f) => (frames[f.properties.key]?.peak ?? 0) > 0)
+    .map((f) => f.id)
+    .join(',')
+  if (!force && sig === peakSignature) return
+  peakSignature = sig
+  const peaks = new Set(sig.split(','))
+  ;(m.getSource(SRC.sgg) as GeoJSONSource).setData({
+    type: 'FeatureCollection',
+    features: g.sgg.features.map((f) => ({ ...f, properties: { ...f.properties, peak: peaks.has(String(f.id)) } })),
+  })
 }
 
 /** 서버 값 매칭 → 목표 값/라벨 높이 계산 */
@@ -184,16 +215,16 @@ async function applySido(code: string) {
   geo.value = g
   m.removeFeatureState({ source: SRC.sgg })
   ;(m.getSource(SRC.outline) as GeoJSONSource).setData(g.outline)
-  ;(m.getSource(SRC.sgg) as GeoJSONSource).setData(g.sgg)
+  updatePeakSource({}, true)
   reset()
   fitView()
   emit('loaded', g)
 }
 
-function applyColor(color: string) {
+function applyLook() {
   const m = map.value
   if (!m?.getLayer(LAYER.extrusion)) return
-  for (const [layer, prop, value] of colorPaint(color))
+  for (const [layer, prop, value] of lookPaint(props.config))
     m.setPaintProperty(layer, prop as Parameters<Map['setPaintProperty']>[1], value)
 }
 
@@ -216,7 +247,7 @@ onMounted(() => {
     m.addSource(SRC.outline, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.sgg, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.labels, { type: 'geojson', data: EMPTY })
-    for (const layer of createLayers(props.config.color)) m.addLayer(layer)
+    for (const layer of createLayers(props.config)) m.addLayer(layer)
 
     m.on('move', liftLabels)
     applySido(props.sido)
@@ -241,7 +272,12 @@ watch(
     render(animator.frames, true)
   },
 )
-watch(() => props.config.color, applyColor)
+watch(() => [props.config.color, props.config.dimOpacity, props.config.dimLightness], applyLook)
+watch(
+  () => props.padding,
+  () => fitView(),
+  { deep: true },
+)
 watch(
   () => props.pitch,
   (pitch) => map.value?.easeTo({ pitch, duration: 600 }),

@@ -1,4 +1,5 @@
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl'
+import type { SidoConfig } from '../types'
 import { LABEL_FONT } from './style'
 import { paletteOf } from './color'
 
@@ -11,23 +12,20 @@ export const SRC = {
 export const LAYER = {
   floor: 'sido-floor',
   floorLine: 'sido-floor-line',
+  /** 100% 블록 (불투명, 메인 색) — 반투명 레이어보다 먼저 그려야 가림이 올바르다 */
+  extrusionPeak: 'sgg-extrusion-peak',
+  /** 0~99.9% 블록 (연한 색, 반투명) */
   extrusion: 'sgg-extrusion',
   label: 'sgg-label',
   labelPeak: 'sgg-label-peak',
 } as const
 
-/**
- * 블록 색: 100%는 밝은 강조색, 그 외는 값(0~100)에 따라 어두운 색 → 메인 색
- * feature-state: v(값), peak(100% 여부)
- */
-export function blockColor(main: string): ExpressionSpecification {
-  const p = paletteOf(main)
-  return [
-    'case',
-    ['boolean', ['feature-state', 'peak'], false],
-    p.peak,
-    ['interpolate', ['linear'], ['coalesce', ['feature-state', 'v'], 0], 0, p.low, 100, p.main],
-  ]
+type Look = Pick<SidoConfig, 'color' | 'dimOpacity' | 'dimLightness'>
+
+/** 0~99.9% 블록 색: 값이 낮을수록 더 연하게 (feature-state v) */
+export function dimColor(look: Look): ExpressionSpecification {
+  const p = paletteOf(look.color, look.dimLightness)
+  return ['interpolate', ['linear'], ['coalesce', ['feature-state', 'v'], 0], 0, p.dimLow, 100, p.dimHigh]
 }
 
 /** 라벨 텍스트: 시군구명 + 줄바꿈 + 퍼센트 */
@@ -41,8 +39,11 @@ const LABEL_TEXT: ExpressionSpecification = [
   { 'font-scale': 1.05 },
 ]
 
-export function createLayers(main: string): LayerSpecification[] {
-  const p = paletteOf(main)
+/** 블록 높이 (feature-state h) */
+const HEIGHT: ExpressionSpecification = ['coalesce', ['feature-state', 'h'], 0]
+
+export function createLayers(look: Look): LayerSpecification[] {
+  const p = paletteOf(look.color, look.dimLightness)
   return [
     // 바닥: 시도 전체 면 (블록 사이 틈으로 보이는 색)
     {
@@ -58,16 +59,32 @@ export function createLayers(main: string): LayerSpecification[] {
       source: SRC.outline,
       paint: { 'line-color': p.floorLine, 'line-width': 1.5, 'line-blur': 1, 'line-opacity': 0.8 },
     },
-    // 시군구 3D 블록 — 높이/색은 feature-state (h, v, peak)
+    // 100% 블록 — 메인 색 그대로, 불투명
+    // (fill-extrusion-opacity는 레이어 단위라 100%/그 외를 레이어로 나누고, 소스 속성 peak로 필터)
+    {
+      id: LAYER.extrusionPeak,
+      type: 'fill-extrusion',
+      source: SRC.sgg,
+      filter: ['==', ['get', 'peak'], true],
+      paint: {
+        'fill-extrusion-color': p.peak,
+        'fill-extrusion-height': HEIGHT,
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 1,
+        'fill-extrusion-vertical-gradient': true,
+      },
+    },
+    // 0~99.9% 블록 — 연한 색, 반투명
     {
       id: LAYER.extrusion,
       type: 'fill-extrusion',
       source: SRC.sgg,
+      filter: ['!=', ['get', 'peak'], true],
       paint: {
-        'fill-extrusion-color': blockColor(main),
-        'fill-extrusion-height': ['coalesce', ['feature-state', 'h'], 0],
+        'fill-extrusion-color': dimColor(look),
+        'fill-extrusion-height': HEIGHT,
         'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.96,
+        'fill-extrusion-opacity': look.dimOpacity,
         'fill-extrusion-vertical-gradient': true,
       },
     },
@@ -121,13 +138,15 @@ export function createLayers(main: string): LayerSpecification[] {
   ]
 }
 
-/** 메인 색상 변경 시 갱신할 paint 속성 */
-export function colorPaint(main: string): [string, string, string | ExpressionSpecification][] {
-  const p = paletteOf(main)
+/** 색 설정 변경 시 갱신할 paint 속성 */
+export function lookPaint(look: Look): [string, string, string | number | ExpressionSpecification][] {
+  const p = paletteOf(look.color, look.dimLightness)
   return [
     [LAYER.floor, 'fill-color', p.floor],
     [LAYER.floorLine, 'line-color', p.floorLine],
-    [LAYER.extrusion, 'fill-extrusion-color', blockColor(main)],
+    [LAYER.extrusionPeak, 'fill-extrusion-color', p.peak],
+    [LAYER.extrusion, 'fill-extrusion-color', dimColor(look)],
+    [LAYER.extrusion, 'fill-extrusion-opacity', look.dimOpacity],
     [LAYER.label, 'text-halo-color', p.labelHalo],
     [LAYER.labelPeak, 'text-halo-color', p.labelHalo],
   ]
