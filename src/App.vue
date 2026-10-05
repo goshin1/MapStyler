@@ -1,45 +1,47 @@
 <template>
-<div>
-  <div class="map">
-    <!-- 지도 영역 -->
+  <div class="app">
+    <div class="map">
+      <!-- 지도 영역 (2단계: MapView.vue) -->
+    </div>
+    <div class="map-remocon">
+      <!-- 지도 애니메이션 컨트롤 (5단계: MapRemocon.vue) -->
+    </div>
   </div>
-  <div class="map-remocon">
-    <!-- 지도 애니메이션 컨트롤 -->
-    <!-- 메인 색상, 시군구 별 % 설정, 각 %차오르는 애니메이션 효과 -->
-  </div>
-</div>
 </template>
+
 <script setup lang="ts">
 /*
-지도는 maplibre-gl를 사용한 영역을 구현한다.
-현재 필요한 기능은 이미지 시안처럼 현대 느낌에 3D지도와 그 밑에 은은하게 깔리는 지도가 필요하다.
+[개발 계획 — feature/3d-map]
+대상: 현재 행정구역 16개 시도 (전남광주통합특별시 포함)
+화면: 시도 하나를 선택하면 해당 시도의 시군구를 3D로 표시 (시안 참조)
 
-지도 이미지는 대한민국 시도 별로만 필요하다
-서울특별시
-부산광역시
-대구광역시
-인천광역시
-광주광역시
-대전광역시
-울산광역시
-세종특별자치시
-경기도
-강원특별자치도
-충청북도
-충청남도
-전북특별자치도
-전라남도
-경상북도
-경상남도
-제주특별자치도
-으로 총 17개로 중요한 점은 폴리곤과 배경 이미지가 맞아 떨어져야 한다는 것
-
-3D 지도에 중요한 점은
-0 ~ 99%와 100%에 확실한 차이가 있어야 한다는 점과 시군구 별 구분이 되야 한다는 것이다.
-이를 위해 100% 일 때의 높이를 살짝 더 높이는 방식으로 진행한다. 단 애초에 0~100% 값에 의한 높이를 낮춘다.
-너무 높게 하지 않는다.
-
-폴리곤 생성을 위한 3D geojson 정보는 루트 디렉터리에 /data/geojson-raw 폴더에 korea-sgg.geojson을 참조하면 된다.
- */
-
+0. 준비          : maplibre CSS, 폴더 구조, 공통 타입
+1. 데이터 전처리 : scripts/build-geo.mjs → public/geo/{sido}.json
+                   (시군구 축소 폴리곤, 시도 외곽선 dissolve, bbox, 라벨 위치)
+2. 3D 지도 기본  : 시도 선택 → fitBounds, pitch 45° 제한, 바닥 + extrusion + 라벨
+3. 값 매칭/표현  : "시도명 시군구명" 공백 제거 정규화 + 별칭표
+                   0~99.9% 낮은 높이, 100%(원본 값 기준)는 살짝 더 높게 + 색 강조
+4. 애니메이션    : requestAnimationFrame + feature-state 로 차오름
+5. 리모컨        : 시도 선택, 메인 색상, 시군구별 %, maxHeight/peakHeight, 재생/리셋
+6. 다크 벡터 배경: OpenFreeMap 기반 커스텀 다크 스타일 + 시도 바깥 마스크
+7. 연출 다듬기   : 글로우, 하이라이트, 1위 강조
+8. 배포 준비     : PMTiles 자체 호스팅, 빌드 검증
+*/
 </script>
+
+<style scoped>
+.app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.map {
+  position: absolute;
+  inset: 0;
+}
+.map-remocon {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+</style>
