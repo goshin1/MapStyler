@@ -151,8 +151,8 @@ export function createBaseStyle(basemap = true): StyleSpecification {
     light: {
       anchor: 'viewport',
       color: '#ffffff',
-      intensity: 0.45,
-      position: [1.2, 210, 35],
+      intensity: 0.55,
+      position: [1.3, 205, 40],
     },
   }
 }

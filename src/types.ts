@@ -60,3 +60,17 @@ export interface BackgroundConfig {
   /** 시도 바깥을 어둡게 누르는 정도 (0~1) */
   maskOpacity: number
 }
+
+/** 강조 효과 설정 */
+export interface EffectConfig {
+  /** 글로우 강도 (0~1) — 100% 블록 주변, 시도 외곽 */
+  glow: number
+  /** 100% 글로우가 은은하게 숨쉬듯 깜빡임 */
+  pulse: boolean
+  /** 100% 블록 위 말풍선 */
+  callout: boolean
+  /** 100%가 없을 때 최고값 시군구에 말풍선 */
+  calloutTopWhenNoPeak: boolean
+  /** 말풍선 부제 ({시도}, {시군구} 치환) */
+  calloutText: string
+}

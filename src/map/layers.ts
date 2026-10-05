@@ -14,7 +14,11 @@ export const LAYER = {
   /** 시도 바깥 어둡게 */
   mask: 'sido-mask',
   floor: 'sido-floor',
+  /** 시도 외곽 은은한 글로우 */
+  sidoGlow: 'sido-glow',
   floorLine: 'sido-floor-line',
+  /** 100% 블록 바닥 주변 글로우 */
+  peakGlow: 'sgg-peak-glow',
   /** 100% 블록 (불투명, 메인 색) — 반투명 레이어보다 먼저 그려야 가림이 올바르다 */
   extrusionPeak: 'sgg-extrusion-peak',
   /** 0~99.9% 블록 (연한 색, 반투명) */
@@ -45,7 +49,7 @@ const LABEL_TEXT: ExpressionSpecification = [
 /** 블록 높이 (feature-state h) */
 const HEIGHT: ExpressionSpecification = ['coalesce', ['feature-state', 'h'], 0]
 
-export function createLayers(look: Look, maskOpacity = 0.35): LayerSpecification[] {
+export function createLayers(look: Look, maskOpacity = 0.35, glow = 0.7): LayerSpecification[] {
   const p = paletteOf(look.color, look.dimLightness)
   return [
     // 시도 바깥 배경 지도를 어둡게 눌러 선택한 시도에 시선이 가도록
@@ -62,12 +66,27 @@ export function createLayers(look: Look, maskOpacity = 0.35): LayerSpecification
       source: SRC.outline,
       paint: { 'fill-color': p.floor, 'fill-opacity': 0.95 },
     },
+    // 시도 외곽 글로우
+    {
+      id: LAYER.sidoGlow,
+      type: 'line',
+      source: SRC.outline,
+      paint: { 'line-color': p.glow, 'line-width': 14, 'line-blur': 14, 'line-opacity': 0.3 * glow },
+    },
     // 바닥 외곽선
     {
       id: LAYER.floorLine,
       type: 'line',
       source: SRC.outline,
       paint: { 'line-color': p.floorLine, 'line-width': 1.5, 'line-blur': 1, 'line-opacity': 0.8 },
+    },
+    // 100% 블록 바닥 글로우 (블록 아래로 번지는 빛)
+    {
+      id: LAYER.peakGlow,
+      type: 'line',
+      source: SRC.sgg,
+      filter: ['==', ['get', 'peak'], true],
+      paint: { 'line-color': p.glow, 'line-width': 22, 'line-blur': 20, 'line-opacity': 0.9 * glow },
     },
     // 100% 블록 — 메인 색 그대로, 불투명
     // (fill-extrusion-opacity는 레이어 단위라 100%/그 외를 레이어로 나누고, 소스 속성 peak로 필터)
@@ -107,10 +126,10 @@ export function createLayers(look: Look, maskOpacity = 0.35): LayerSpecification
       layout: {
         'text-field': LABEL_TEXT,
         'text-font': LABEL_FONT,
-        'text-size': ['interpolate', ['linear'], ['zoom'], 8, 10, 11, 13],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 8, 9.5, 11, 13],
         'text-line-height': 1.15,
         'text-padding': 1,
-        'text-variable-anchor': ['center', 'top', 'bottom'],
+        'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right'],
         'text-radial-offset': 0.4,
         // 값이 큰 곳 우선 표시
         'symbol-sort-key': ['-', 0, ['get', 'v']],
@@ -155,6 +174,8 @@ export function lookPaint(look: Look): [string, string, string | number | Expres
     [LAYER.floor, 'fill-color', p.floor],
     [LAYER.floorLine, 'line-color', p.floorLine],
     [LAYER.extrusionPeak, 'fill-extrusion-color', p.peak],
+    [LAYER.sidoGlow, 'line-color', p.glow],
+    [LAYER.peakGlow, 'line-color', p.glow],
     [LAYER.extrusion, 'fill-extrusion-color', dimColor(look)],
     [LAYER.extrusion, 'fill-extrusion-opacity', look.dimOpacity],
     [LAYER.label, 'text-halo-color', p.labelHalo],

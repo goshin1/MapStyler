@@ -20,6 +20,7 @@ function parse(hex: string): number[] {
 export function paletteOf(main: string, dimLightness = 0.35) {
   return {
     peak: main,
+    glow: main,
     dimHigh: mix(main, '#ffffff', dimLightness),
     dimLow: mix(main, '#ffffff', Math.min(0.85, dimLightness + 0.3)),
     floor: mix(main, '#000000', 0.88),

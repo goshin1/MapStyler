@@ -111,7 +111,18 @@ export function createAnimator(onFrame: (frames: Frames) => void) {
     })
   }
 
-  return { set, animateTo, stop, get frames() { return frames } }
+  return {
+    set,
+    animateTo,
+    stop,
+    get frames() {
+      return frames
+    },
+    /** 애니메이션 진행 중 여부 */
+    get running() {
+      return raf !== 0
+    },
+  }
 }
 
 function sortKeys(

@@ -6,11 +6,13 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Map, type GeoJSONSource, type PaddingOptions } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
-import type { AnimationConfig, BackgroundConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
+import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
 import { BASEMAP_LAYER_IDS, createBaseStyle } from '../map/style'
 import { createMask } from '../map/mask'
+import { CalloutManager, type CalloutItem } from '../map/callout'
 import { createLayers, LAYER, lookPaint, SRC } from '../map/layers'
 import { createAnimator, DEFAULT_ANIMATION, easeOutBack, type Frames } from '../map/animator'
+import { DEFAULT_EFFECTS } from '../map/effects'
 import { formatPct, heightOf, isPeak, matchTurnout, type MatchResult } from '../composables/useTurnout'
 
 const props = withDefaults(
@@ -31,6 +33,8 @@ const props = withDefaults(
     padding?: PaddingOptions
     /** 배경 지도 설정 */
     background?: BackgroundConfig
+    /** 강조 효과 설정 */
+    effects?: EffectConfig
   }>(),
   {
     values: () => ({}),
@@ -39,6 +43,7 @@ const props = withDefaults(
     pitch: 45,
     padding: () => ({ top: 60, bottom: 60, left: 60, right: 60 }),
     background: () => ({ basemap: true, maskOpacity: 0.35 }),
+    effects: () => ({ ...DEFAULT_EFFECTS }),
   },
 )
 
@@ -98,6 +103,8 @@ function liftLabels() {
   const k = Math.sin((m.getPitch() * Math.PI) / 180) / metersPerPixel
   m.setPaintProperty(LAYER.label, 'text-translate', [0, -labelHeight * k])
   m.setPaintProperty(LAYER.labelPeak, 'text-translate', [0, -peakLabelHeight * k])
+  // 말풍선은 100% 블록(또는 1위 블록) 윗면 위에 + 라벨 높이만큼 더 띄움
+  callouts?.setLift(calloutHeight * k + 34)
 }
 
 /** 표시 상태(frames) → 블록 feature-state + 라벨 */
@@ -148,6 +155,72 @@ function render(frames: Frames, forceLabels = false) {
     }),
   }
   ;(m.getSource(SRC.labels) as GeoJSONSource).setData(labels)
+  updateCallouts(frames)
+}
+
+/** 말풍선 대상: 100% 시군구. 100%가 없으면(옵션) 애니메이션이 끝난 뒤 최고값 시군구 */
+let callouts: CalloutManager | undefined
+let calloutHeight = 0
+function updateCallouts(frames: Frames) {
+  const g = geo.value
+  if (!callouts || !g) return
+  const fx = props.effects
+  if (!fx.callout) {
+    callouts.clear()
+    return
+  }
+  const cfg = props.config
+  let picks = g.labels.features.filter((f) => (frames[f.properties.key]?.peak ?? 0) > 0)
+  let isTop = false
+  if (!picks.length && fx.calloutTopWhenNoPeak && !animator.running) {
+    let best = -1
+    for (const f of g.labels.features) {
+      const v = targets[f.properties.key]
+      if (v !== undefined && v > best) best = v
+    }
+    if (best >= 0) {
+      picks = g.labels.features.filter((f) => targets[f.properties.key] === best)
+      isTop = true
+    }
+  }
+  calloutHeight = isTop ? heightOf(Math.min(99.9, (targets[picks[0].properties.key] as number) ?? 0), cfg) : peakLabelHeight
+  const items: CalloutItem[] = picks.map((f) => {
+    const v = targets[f.properties.key] ?? 0
+    return {
+      key: f.properties.key,
+      lngLat: f.geometry.coordinates as [number, number],
+      title: f.properties.sggnm,
+      value: isTop ? formatPct(Math.min(v, 99.9)) : formatPct(100),
+      sub: fx.calloutText.replaceAll('{시도}', g.sidonm).replaceAll('{시군구}', f.properties.sggnm),
+    }
+  })
+  callouts.update(items, cfg.color)
+  liftLabels()
+}
+
+/** 100% 글로우 숨쉬기 효과 */
+let pulseRaf = 0
+function pulseLoop(now: number) {
+  const m = map.value
+  if (!m?.getLayer(LAYER.peakGlow)) return
+  const fx = props.effects
+  const wave = fx.pulse ? 0.5 + 0.5 * Math.sin(now / 450) : 1
+  m.setPaintProperty(LAYER.peakGlow, 'line-opacity', 0.9 * fx.glow * (0.55 + 0.45 * wave))
+  m.setPaintProperty(LAYER.peakGlow, 'line-width', 18 + 10 * wave)
+  pulseRaf = fx.pulse && peakSignature ? requestAnimationFrame(pulseLoop) : 0
+}
+function startPulse() {
+  if (pulseRaf) cancelAnimationFrame(pulseRaf)
+  pulseRaf = requestAnimationFrame(pulseLoop)
+}
+
+/** 글로우 강도 반영 */
+function applyEffects() {
+  const m = map.value
+  if (!m?.getLayer(LAYER.sidoGlow)) return
+  m.setPaintProperty(LAYER.sidoGlow, 'line-opacity', 0.3 * props.effects.glow)
+  startPulse()
+  updateCallouts(animator.frames)
 }
 
 /**
@@ -165,6 +238,7 @@ function updatePeakSource(frames: Frames, force = false) {
     .join(',')
   if (!force && sig === peakSignature) return
   peakSignature = sig
+  startPulse()
   const peaks = new Set(sig.split(','))
   ;(m.getSource(SRC.sgg) as GeoJSONSource).setData({
     type: 'FeatureCollection',
@@ -223,6 +297,7 @@ async function applySido(code: string) {
   animator.stop()
   const g = await loadSido(code)
   if (req !== sidoRequest) return
+  callouts?.clear()
   geo.value = g
   m.removeFeatureState({ source: SRC.sgg })
   ;(m.getSource(SRC.mask) as GeoJSONSource).setData(createMask(g.outline))
@@ -247,6 +322,7 @@ function applyLook() {
   if (!m?.getLayer(LAYER.extrusion)) return
   for (const [layer, prop, value] of lookPaint(props.config))
     m.setPaintProperty(layer, prop as Parameters<Map['setPaintProperty']>[1], value)
+  updateCallouts(animator.frames)
 }
 
 onMounted(() => {
@@ -272,7 +348,8 @@ onMounted(() => {
     m.addSource(SRC.outline, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.sgg, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.labels, { type: 'geojson', data: EMPTY })
-    for (const layer of createLayers(props.config, props.background.maskOpacity)) m.addLayer(layer)
+    for (const layer of createLayers(props.config, props.background.maskOpacity, props.effects.glow)) m.addLayer(layer)
+    callouts = new CalloutManager(m)
     applyBackground()
 
     m.on('move', liftLabels)
@@ -301,6 +378,7 @@ watch(
 )
 watch(() => [props.config.color, props.config.dimOpacity, props.config.dimLightness], applyLook)
 watch(() => props.background, applyBackground, { deep: true })
+watch(() => props.effects, applyEffects, { deep: true })
 watch(
   () => props.padding,
   () => fitView(),
@@ -313,6 +391,8 @@ watch(
 
 onBeforeUnmount(() => {
   animator.stop()
+  cancelAnimationFrame(pulseRaf)
+  callouts?.clear()
   map.value?.remove()
 })
 

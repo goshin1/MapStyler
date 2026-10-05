@@ -51,6 +51,23 @@
         <Slider v-model="config.dimOpacity" label="0~99% 불투명도" :min="0.2" :max="1" :step="0.01" />
       </section>
 
+      <!-- 강조 효과 -->
+      <section>
+        <h3>강조 효과</h3>
+        <Slider v-model="effects.glow" label="글로우 강도" :min="0" :max="1" :step="0.05" />
+        <label class="check"><input v-model="effects.pulse" type="checkbox" /> 100% 글로우 숨쉬기</label>
+        <label class="check"><input v-model="effects.callout" type="checkbox" /> 100% 말풍선</label>
+        <label class="check">
+          <input v-model="effects.calloutTopWhenNoPeak" type="checkbox" :disabled="!effects.callout" />
+          100%가 없으면 1위에 말풍선
+        </label>
+        <div class="row">
+          <label>말풍선 문구</label>
+          <input v-model="effects.calloutText" class="text" type="text" :disabled="!effects.callout" />
+        </div>
+        <p class="hint">{시도}, {시군구} 는 이름으로 바뀝니다</p>
+      </section>
+
       <!-- 높이 -->
       <section>
         <h3>높이 (m)</h3>
@@ -136,7 +153,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { AnimationConfig, BackgroundConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
+import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
 import type { MatchResult } from '../composables/useTurnout'
 import Slider from './RemoconSlider.vue'
 
@@ -158,6 +175,7 @@ const config = defineModel<SidoConfig>('config', { required: true })
 const animation = defineModel<AnimationConfig>('animation', { required: true })
 const values = defineModel<TurnoutInput>('values', { required: true })
 const background = defineModel<BackgroundConfig>('background', { required: true })
+const effects = defineModel<EffectConfig>('effects', { required: true })
 const autoplay = defineModel<boolean>('autoplay', { default: true })
 /** 패널 접힘 (H 키) — 지도 여백 계산에 쓰이므로 밖으로 노출 */
 const collapsed = defineModel<boolean>('collapsed', { default: false })
@@ -351,6 +369,21 @@ input[type='color'] {
   width: 100%;
   margin-top: 8px;
   resize: vertical;
+}
+input.text {
+  flex: 1;
+  min-width: 0;
+  background: #0a1020;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+}
+.hint {
+  margin: -2px 0 0;
+  font-size: 11px;
+  color: var(--muted);
 }
 .warn {
   color: #ffb020;

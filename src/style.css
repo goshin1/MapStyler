@@ -19,3 +19,62 @@ html, body, #app {
   color: var(--text);
   overflow: hidden;
 }
+
+/* ── 100% / 1위 말풍선 (src/map/callout.ts) ── */
+.peak-callout {
+  --callout-color: #e3141c;
+  pointer-events: none;
+}
+.peak-callout__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: bottom center;
+  animation: callout-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+.peak-callout__box {
+  background: rgba(8, 11, 20, 0.9);
+  border: 1px solid var(--callout-color);
+  border-radius: 6px;
+  padding: 6px 14px 7px;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--callout-color) 55%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--callout-color) 18%, transparent);
+}
+.peak-callout__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+.peak-callout__title svg {
+  color: var(--callout-color);
+}
+.peak-callout__title b {
+  color: var(--callout-color);
+  filter: brightness(1.25);
+}
+.peak-callout__sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.peak-callout__stem {
+  width: 1px;
+  height: 26px;
+  background: linear-gradient(var(--callout-color), transparent);
+}
+@keyframes callout-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
