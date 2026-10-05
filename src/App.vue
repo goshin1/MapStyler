@@ -1,15 +1,35 @@
 <template>
   <div class="app">
     <div class="map">
-      <!-- 지도 영역 (2단계: MapView.vue) -->
+      <MapView :sido="sido" />
     </div>
     <div class="map-remocon">
-      <!-- 지도 애니메이션 컨트롤 (5단계: MapRemocon.vue) -->
+      <!-- 지도 애니메이션 컨트롤 (5단계: MapRemocon.vue) — 지금은 시도 선택만 임시로 -->
+      <select v-model="sido">
+        <option v-for="s in sidoList" :key="s.sido" :value="s.sido">{{ s.sidonm }}</option>
+      </select>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import MapView from './components/MapView.vue'
+
+interface SidoIndex {
+  sido: string
+  sidonm: string
+  bbox: [number, number, number, number]
+  count: number
+}
+
+const sido = ref('11')
+const sidoList = ref<SidoIndex[]>([])
+
+onMounted(async () => {
+  sidoList.value = await (await fetch(`${import.meta.env.BASE_URL}geo/index.json`)).json()
+})
+
 /*
 [개발 계획 — feature/3d-map]
 대상: 현재 행정구역 16개 시도 (전남광주통합특별시 포함)
@@ -43,5 +63,13 @@
   position: absolute;
   top: 16px;
   right: 16px;
+  z-index: 1;
+}
+.map-remocon select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
 }
 </style>
