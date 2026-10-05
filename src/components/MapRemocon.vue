@@ -16,6 +16,20 @@
         </select>
       </section>
 
+      <!-- 배경 -->
+      <section>
+        <h3>배경 지도</h3>
+        <label class="check"><input v-model="background.basemap" type="checkbox" /> 도로/강 배경 표시</label>
+        <Slider
+          v-model="background.maskOpacity"
+          label="시도 바깥 어둡게"
+          :min="0"
+          :max="1"
+          :step="0.05"
+          :disabled="!background.basemap"
+        />
+      </section>
+
       <!-- 색상 -->
       <section>
         <h3>색상</h3>
@@ -122,7 +136,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { AnimationConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
+import type { AnimationConfig, BackgroundConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
 import type { MatchResult } from '../composables/useTurnout'
 import Slider from './RemoconSlider.vue'
 
@@ -143,6 +157,7 @@ const sido = defineModel<string>('sido', { required: true })
 const config = defineModel<SidoConfig>('config', { required: true })
 const animation = defineModel<AnimationConfig>('animation', { required: true })
 const values = defineModel<TurnoutInput>('values', { required: true })
+const background = defineModel<BackgroundConfig>('background', { required: true })
 const autoplay = defineModel<boolean>('autoplay', { default: true })
 /** 패널 접힘 (H 키) — 지도 여백 계산에 쓰이므로 밖으로 노출 */
 const collapsed = defineModel<boolean>('collapsed', { default: false })

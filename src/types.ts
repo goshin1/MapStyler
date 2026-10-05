@@ -52,3 +52,11 @@ export interface AnimationConfig {
   /** together: 동시 / ascending: 낮은 값부터(100%가 마지막) / random: 무작위 순서 */
   order: 'together' | 'ascending' | 'random'
 }
+
+/** 배경 지도 설정 */
+export interface BackgroundConfig {
+  /** 도로/강 배경 지도 표시 */
+  basemap: boolean
+  /** 시도 바깥을 어둡게 누르는 정도 (0~1) */
+  maskOpacity: number
+}

@@ -9,6 +9,7 @@
         :animation="animation"
         :autoplay="autoplay"
         :padding="padding"
+        :background="background"
         @loaded="onLoaded"
         @matched="match = $event"
       />
@@ -21,6 +22,7 @@
         v-model:values="values"
         v-model:autoplay="autoplay"
         v-model:collapsed="collapsed"
+        v-model:background="background"
         :sido-list="sidoList"
         :geo="geo"
         :match="match"
@@ -54,7 +56,7 @@
 import { computed, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import MapView from './components/MapView.vue'
 import MapRemocon, { type SidoIndex } from './components/MapRemocon.vue'
-import type { AnimationConfig, SidoConfig, SidoGeo, TurnoutInput } from './types'
+import type { AnimationConfig, BackgroundConfig, SidoConfig, SidoGeo, TurnoutInput } from './types'
 import { getSidoConfig } from './config/sido'
 import { mockTurnout, type MatchResult } from './composables/useTurnout'
 import { DEFAULT_ANIMATION } from './map/animator'
@@ -64,6 +66,7 @@ const sidoList = ref<SidoIndex[]>([])
 const config = ref<SidoConfig>(getSidoConfig(sido.value))
 const animation = ref<AnimationConfig>({ ...DEFAULT_ANIMATION })
 const autoplay = ref(true)
+const background = ref<BackgroundConfig>({ basemap: true, maskOpacity: 0.35 })
 const values = ref<TurnoutInput>({})
 const geo = shallowRef<SidoGeo>()
 const match = ref<MatchResult>()

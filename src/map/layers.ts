@@ -1,15 +1,18 @@
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl'
 import type { SidoConfig } from '../types'
-import { LABEL_FONT } from './style'
+import { BASEMAP_COLORS, LABEL_FONT } from './style'
 import { paletteOf } from './color'
 
 export const SRC = {
+  mask: 'sido-mask',
   outline: 'sido-outline',
   sgg: 'sgg',
   labels: 'sgg-labels',
 } as const
 
 export const LAYER = {
+  /** 시도 바깥 어둡게 */
+  mask: 'sido-mask',
   floor: 'sido-floor',
   floorLine: 'sido-floor-line',
   /** 100% 블록 (불투명, 메인 색) — 반투명 레이어보다 먼저 그려야 가림이 올바르다 */
@@ -42,9 +45,16 @@ const LABEL_TEXT: ExpressionSpecification = [
 /** 블록 높이 (feature-state h) */
 const HEIGHT: ExpressionSpecification = ['coalesce', ['feature-state', 'h'], 0]
 
-export function createLayers(look: Look): LayerSpecification[] {
+export function createLayers(look: Look, maskOpacity = 0.35): LayerSpecification[] {
   const p = paletteOf(look.color, look.dimLightness)
   return [
+    // 시도 바깥 배경 지도를 어둡게 눌러 선택한 시도에 시선이 가도록
+    {
+      id: LAYER.mask,
+      type: 'fill',
+      source: SRC.mask,
+      paint: { 'fill-color': BASEMAP_COLORS.background, 'fill-opacity': maskOpacity },
+    },
     // 바닥: 시도 전체 면 (블록 사이 틈으로 보이는 색)
     {
       id: LAYER.floor,

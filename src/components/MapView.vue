@@ -6,8 +6,9 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Map, type GeoJSONSource, type PaddingOptions } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
-import type { AnimationConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
-import { BASE_STYLE } from '../map/style'
+import type { AnimationConfig, BackgroundConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
+import { BASEMAP_LAYER_IDS, createBaseStyle } from '../map/style'
+import { createMask } from '../map/mask'
 import { createLayers, LAYER, lookPaint, SRC } from '../map/layers'
 import { createAnimator, DEFAULT_ANIMATION, easeOutBack, type Frames } from '../map/animator'
 import { formatPct, heightOf, isPeak, matchTurnout, type MatchResult } from '../composables/useTurnout'
@@ -28,6 +29,8 @@ const props = withDefaults(
     pitch?: number
     /** 시도를 화면에 맞출 때 여백(px) — 리모컨 패널이 가리는 영역 제외용 */
     padding?: PaddingOptions
+    /** 배경 지도 설정 */
+    background?: BackgroundConfig
   }>(),
   {
     values: () => ({}),
@@ -35,6 +38,7 @@ const props = withDefaults(
     autoplay: true,
     pitch: 45,
     padding: () => ({ top: 60, bottom: 60, left: 60, right: 60 }),
+    background: () => ({ basemap: true, maskOpacity: 0.35 }),
   },
 )
 
@@ -207,18 +211,35 @@ function showNow() {
   render(animator.frames, true)
 }
 
+/** 지도 스타일 로드 완료 여부 (그 전에 시도가 바뀌면 load 때 반영) */
+let ready = false
+/** 시도 요청 순번 — 빠르게 여러 번 바꿔도 마지막 요청만 반영 */
+let sidoRequest = 0
+
 async function applySido(code: string) {
   const m = map.value
-  if (!m) return
+  if (!m || !ready) return
+  const req = ++sidoRequest
   animator.stop()
   const g = await loadSido(code)
+  if (req !== sidoRequest) return
   geo.value = g
   m.removeFeatureState({ source: SRC.sgg })
+  ;(m.getSource(SRC.mask) as GeoJSONSource).setData(createMask(g.outline))
   ;(m.getSource(SRC.outline) as GeoJSONSource).setData(g.outline)
   updatePeakSource({}, true)
   reset()
   fitView()
   emit('loaded', g)
+}
+
+/** 배경 지도 켜기/끄기, 바깥 어둡게 */
+function applyBackground() {
+  const m = map.value
+  if (!m?.getLayer(LAYER.mask)) return
+  const vis = props.background.basemap ? 'visible' : 'none'
+  for (const id of BASEMAP_LAYER_IDS) if (m.getLayer(id)) m.setLayoutProperty(id, 'visibility', vis)
+  m.setPaintProperty(LAYER.mask, 'fill-opacity', props.background.basemap ? props.background.maskOpacity : 0)
 }
 
 function applyLook() {
@@ -231,7 +252,7 @@ function applyLook() {
 onMounted(() => {
   const m = new Map({
     container: container.value!,
-    style: BASE_STYLE,
+    style: createBaseStyle(true),
     center: [127.8, 36.2],
     zoom: 6,
     pitch: props.pitch,
@@ -242,14 +263,20 @@ onMounted(() => {
     canvasContextAttributes: { antialias: true },
   })
   map.value = m
+  // 개발 중 콘솔 디버깅용
+  if (import.meta.env.DEV) (window as unknown as { __map: Map }).__map = m
+  m.on('error', (e) => console.error('[map]', e.error?.message ?? e))
 
   m.on('load', () => {
+    m.addSource(SRC.mask, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.outline, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.sgg, { type: 'geojson', data: EMPTY })
     m.addSource(SRC.labels, { type: 'geojson', data: EMPTY })
-    for (const layer of createLayers(props.config)) m.addLayer(layer)
+    for (const layer of createLayers(props.config, props.background.maskOpacity)) m.addLayer(layer)
+    applyBackground()
 
     m.on('move', liftLabels)
+    ready = true
     applySido(props.sido)
   })
 })
@@ -273,6 +300,7 @@ watch(
   },
 )
 watch(() => [props.config.color, props.config.dimOpacity, props.config.dimLightness], applyLook)
+watch(() => props.background, applyBackground, { deep: true })
 watch(
   () => props.padding,
   () => fitView(),
