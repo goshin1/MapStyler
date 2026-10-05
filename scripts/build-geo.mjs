@@ -9,6 +9,7 @@
  *  - 시군구 폴리곤을 안쪽으로 살짝 축소 → 3D 블록 사이에 틈이 생겨 구분선 역할
  *  - 시도 외곽선: 원본 시군구를 합쳐(dissolve) 생성 → 시군구와 경계가 정확히 일치
  *  - 라벨 위치: polylabel (폴리곤 내부에서 가장 넓은 지점)
+ *  - 일반구가 있는 시(수원시장안구, 성남시분당구 …)는 구를 합쳐 시 하나의 폴리곤으로 통합
  *  - 매칭 키: "시도명시군구명" 공백 제거 (서버 값 "서울특별시 종로구" 와 매칭)
  *
  * 실행 : npm run build:geo
@@ -79,6 +80,31 @@ function dissolve(features) {
   )
 }
 
+/** "수원시장안구" → "수원시" (일반구가 아니면 null) */
+const GU_OF_CITY = /^(.+?시)(.+구)$/
+
+/**
+ * 일반구를 상위 시로 통합.
+ * 같은 시의 구들을 하나의 폴리곤으로 합치고, 코드는 시 코드(앞 4자리 + 0)를 사용한다.
+ */
+function mergeCityGu(features) {
+  const groups = new Map()
+  for (const f of features) {
+    const m = GU_OF_CITY.exec(f.properties.sggnm)
+    const name = m ? m[1] : f.properties.sggnm
+    const code = m ? f.properties.sgg.slice(0, 4) + '0' : f.properties.sgg
+    if (!groups.has(code)) groups.set(code, { name, code, members: [] })
+    groups.get(code).members.push(f)
+  }
+  return [...groups.values()].map(({ name, code, members }) => {
+    const geom =
+      members.length === 1
+        ? members[0].geometry
+        : turf.union(turf.featureCollection(members)).geometry
+    return turf.feature(geom, { ...members[0].properties, sggnm: name, sgg: code })
+  })
+}
+
 /** 라벨 위치: 가장 넓은 파트에서 polylabel */
 function labelPoint(geom) {
   const biggest = parts(geom)
@@ -111,7 +137,8 @@ function main() {
     const keys = new Set()
     const sgg = []
     const labels = []
-    for (const f of feats) {
+    const merged = mergeCityGu(feats)
+    for (const f of merged) {
       const { sgg: code, sggnm } = f.properties
       const props = { sgg: code, sidonm, sggnm, key: normalizeKey(sidonm + sggnm) }
       if (keys.has(props.key)) throw new Error(`매칭 키 중복: ${props.key}`)
