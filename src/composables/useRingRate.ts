@@ -1,4 +1,4 @@
-import type { SidoConfig, SidoGeo, TurnoutInput } from '../types'
+import type { SidoConfig, SidoGeo, RateInput } from '../types'
 import { MIN_HEIGHT_RATIO, SIDO_ALIAS } from '../config/sido'
 
 /** 공백 제거 */
@@ -40,7 +40,7 @@ export interface MatchResult {
 }
 
 /** 서버 입력("서울특별시 종로구": 72.4)을 현재 시도 지도와 매칭 */
-export function matchTurnout(input: TurnoutInput, geo: SidoGeo): MatchResult {
+export function matchRates(input: RateInput, geo: SidoGeo): MatchResult {
   const keys = new Set(geo.sgg.features.map((f) => f.properties.key))
   const values: Record<string, number> = {}
   const unmatched: string[] = []
@@ -50,17 +50,20 @@ export function matchTurnout(input: TurnoutInput, geo: SidoGeo): MatchResult {
     else if (key.startsWith(normalizeKey(geo.sidonm))) unmatched.push(name)
   }
   const missing = geo.sgg.features.filter((f) => !(f.properties.key in values)).map((f) => f.properties.sggnm)
-  if (unmatched.length) console.warn('[turnout] 매칭 안 된 이름:', unmatched)
+  if (unmatched.length) console.warn('[rate] 매칭 안 된 이름:', unmatched)
   return { values, unmatched, missing }
 }
 
-/** 테스트용 임의 값 (서버 입력 형식) — 한 곳은 100% */
-export function mockTurnout(geo: SidoGeo): TurnoutInput {
-  const out: TurnoutInput = {}
+/** 테스트용 임의 값 (서버 입력 형식) — 100%는 peaks 곳 (기본: 1~3곳 무작위) */
+export function mockRates(geo: SidoGeo, peaks = 1 + Math.floor(Math.random() * 3)): RateInput {
+  const out: RateInput = {}
   const feats = geo.sgg.features
-  const peak = Math.floor(Math.random() * feats.length)
+  const order = feats.map((_, i) => i).sort(() => Math.random() - 0.5)
+  const peakSet = new Set(order.slice(0, Math.min(peaks, feats.length)))
   feats.forEach((f, i) => {
-    out[`${f.properties.sidonm} ${f.properties.sggnm}`] = i === peak ? 100 : Math.round((60 + Math.random() * 25) * 10) / 10
+    out[`${f.properties.sidonm} ${f.properties.sggnm}`] = peakSet.has(i)
+      ? 100
+      : Math.round((60 + Math.random() * 25) * 10) / 10
   })
   return out
 }

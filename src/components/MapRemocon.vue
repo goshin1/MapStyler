@@ -56,7 +56,7 @@
         <h3>강조 효과</h3>
         <Slider v-model="effects.glow" label="글로우 강도" :min="0" :max="1" :step="0.05" />
         <label class="check"><input v-model="effects.pulse" type="checkbox" /> 100% 글로우 숨쉬기</label>
-        <label class="check"><input v-model="effects.callout" type="checkbox" /> 100% 말풍선</label>
+        <label class="check"><input v-model="effects.callout" type="checkbox" /> 100% 말풍선 / 요약</label>
         <label class="check">
           <input v-model="effects.calloutTopWhenNoPeak" type="checkbox" :disabled="!effects.callout" />
           100%가 없으면 1위에 말풍선
@@ -65,7 +65,11 @@
           <label>말풍선 문구</label>
           <input v-model="effects.calloutText" class="text" type="text" :disabled="!effects.callout" />
         </div>
-        <p class="hint">{시도}, {시군구} 는 이름으로 바뀝니다</p>
+        <div class="row">
+          <label>여러 곳일 때</label>
+          <input v-model="effects.summaryText" class="text" type="text" :disabled="!effects.callout" />
+        </div>
+        <p class="hint">{시도}, {시군구}, {개수} 는 실제 값으로 바뀝니다. 100%가 여러 곳이면 화면 위쪽에 요약 박스 하나만 표시합니다.</p>
       </section>
 
       <!-- 높이 -->
@@ -153,8 +157,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
-import type { MatchResult } from '../composables/useTurnout'
+import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, RateInput } from '../types'
+import type { MatchResult } from '../composables/useRingRate'
 import Slider from './RemoconSlider.vue'
 
 export interface SidoIndex {
@@ -173,7 +177,7 @@ const props = defineProps<{
 const sido = defineModel<string>('sido', { required: true })
 const config = defineModel<SidoConfig>('config', { required: true })
 const animation = defineModel<AnimationConfig>('animation', { required: true })
-const values = defineModel<TurnoutInput>('values', { required: true })
+const values = defineModel<RateInput>('values', { required: true })
 const background = defineModel<BackgroundConfig>('background', { required: true })
 const effects = defineModel<EffectConfig>('effects', { required: true })
 const autoplay = defineModel<boolean>('autoplay', { default: true })
@@ -214,7 +218,7 @@ function applyImport() {
   try {
     const data = JSON.parse(importText.value)
     if (typeof data !== 'object' || Array.isArray(data)) throw new Error('{"이름": 값} 형식이어야 합니다')
-    const out: TurnoutInput = {}
+    const out: RateInput = {}
     for (const [k, v] of Object.entries(data)) {
       const n = typeof v === 'number' ? v : parseFloat(String(v))
       if (!Number.isNaN(n)) out[k] = n

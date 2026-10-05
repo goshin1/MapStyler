@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+Claude outputs
+# 배경 지도 PMTiles (용량이 커서 git 제외, README 참고)
+data/tiles/
+public/tiles/*.pmtiles

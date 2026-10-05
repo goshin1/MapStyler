@@ -5,5 +5,6 @@ export const DEFAULT_EFFECTS: EffectConfig = {
   pulse: true,
   callout: true,
   calloutTopWhenNoPeak: true,
-  calloutText: '{시도} 최고 투표율',
+  calloutText: '{시도} 울림율 100%',
+  summaryText: '{시도} 울림율 100% 달성 {개수}곳',
 }

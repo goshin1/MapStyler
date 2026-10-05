@@ -1,26 +1,46 @@
 <template>
-  <div ref="container" class="map-view" />
+  <div class="map-view">
+    <div ref="container" class="map-canvas" />
+    <!-- 100%가 여러 곳일 때 요약 박스 -->
+    <Transition name="summary">
+      <div
+        v-if="summary"
+        class="peak-summary"
+        :style="{ left: `${padding.left ?? 0}px`, right: `${padding.right ?? 0}px`, '--callout-color': config.color }"
+      >
+        <div class="peak-summary__box">
+          <div class="peak-summary__title">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7zm2.6 13h12.8v1.6H5.6z" />
+            </svg>
+            <span>{{ summary.title }}</span>
+          </div>
+          <div class="peak-summary__names">{{ summary.names }}</div>
+        </div>
+      </div>
+    </Transition>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Map, type GeoJSONSource, type PaddingOptions } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
-import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, TurnoutInput } from '../types'
-import { BASEMAP_LAYER_IDS, createBaseStyle } from '../map/style'
+import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, RateInput } from '../types'
+import { BASEMAP_LAYER_IDS, BASEMAP_SOURCE, BASEMAP_URL, basemapLayers, createBaseStyle } from '../map/style'
 import { createMask } from '../map/mask'
 import { CalloutManager, type CalloutItem } from '../map/callout'
 import { createLayers, LAYER, lookPaint, SRC } from '../map/layers'
 import { createAnimator, DEFAULT_ANIMATION, easeOutBack, type Frames } from '../map/animator'
 import { DEFAULT_EFFECTS } from '../map/effects'
-import { formatPct, heightOf, isPeak, matchTurnout, type MatchResult } from '../composables/useTurnout'
+import { formatPct, heightOf, isPeak, matchRates, type MatchResult } from '../composables/useRingRate'
 
 const props = withDefaults(
   defineProps<{
     /** 시도 코드 (예: '11' 서울) */
     sido: string
     /** 서버 값: "서울특별시 종로구" → 72.4 */
-    values?: TurnoutInput
+    values?: RateInput
     /** 높이/색 설정 */
     config: SidoConfig
     /** 차오름 애니메이션 설정 */
@@ -158,7 +178,17 @@ function render(frames: Frames, forceLabels = false) {
   updateCallouts(frames)
 }
 
-/** 말풍선 대상: 100% 시군구. 100%가 없으면(옵션) 애니메이션이 끝난 뒤 최고값 시군구 */
+/** 100%가 여러 곳일 때 요약 박스 내용 */
+const summary = ref<{ title: string; names: string } | null>(null)
+/** 요약 박스에 이름을 나열할 최대 개수 */
+const SUMMARY_MAX_NAMES = 8
+
+/**
+ * 말풍선 대상
+ * - 100%가 1곳: 그 블록 위 말풍선
+ * - 100%가 여러 곳: 말풍선 대신 화면 위쪽 요약 박스 1개
+ * - 100%가 없음(옵션): 애니메이션이 끝난 뒤 최고값 시군구 말풍선
+ */
 let callouts: CalloutManager | undefined
 let calloutHeight = 0
 function updateCallouts(frames: Frames) {
@@ -167,10 +197,24 @@ function updateCallouts(frames: Frames) {
   const fx = props.effects
   if (!fx.callout) {
     callouts.clear()
+    summary.value = null
     return
   }
   const cfg = props.config
   let picks = g.labels.features.filter((f) => (frames[f.properties.key]?.peak ?? 0) > 0)
+  // 목표 값 기준 100%가 여러 곳이면 처음부터 요약 박스로 (차오르는 동안 "1곳 → 2곳 → …" 갱신)
+  const targetPeaks = Object.values(targets).filter((v) => v !== undefined && isPeak(v)).length
+  if (picks.length > 1 || (picks.length === 1 && targetPeaks > 1)) {
+    callouts.clear()
+    const names = picks.map((f) => f.properties.sggnm).sort((a, b) => a.localeCompare(b, 'ko'))
+    const shown = names.slice(0, SUMMARY_MAX_NAMES).join(' · ')
+    summary.value = {
+      title: fx.summaryText.replaceAll('{시도}', g.sidonm).replaceAll('{개수}', String(picks.length)),
+      names: names.length > SUMMARY_MAX_NAMES ? `${shown} 외 ${names.length - SUMMARY_MAX_NAMES}곳` : shown,
+    }
+    return
+  }
+  summary.value = null
   let isTop = false
   if (!picks.length && fx.calloutTopWhenNoPeak && !animator.running) {
     let best = -1
@@ -250,7 +294,7 @@ function updatePeakSource(frames: Frames, force = false) {
 function updateTargets() {
   const g = geo.value
   if (!g) return
-  const result = matchTurnout(props.values, g)
+  const result = matchRates(props.values, g)
   targets = {}
   for (const f of g.sgg.features) targets[f.properties.key] = result.values[f.properties.key]
   emit('matched', result)
@@ -298,6 +342,7 @@ async function applySido(code: string) {
   const g = await loadSido(code)
   if (req !== sidoRequest) return
   callouts?.clear()
+  summary.value = null
   geo.value = g
   m.removeFeatureState({ source: SRC.sgg })
   ;(m.getSource(SRC.mask) as GeoJSONSource).setData(createMask(g.outline))
@@ -306,6 +351,17 @@ async function applySido(code: string) {
   reset()
   fitView()
   emit('loaded', g)
+}
+
+/** 배경 지도(도로/강)를 시도 레이어들 아래에 추가. 실패해도 나머지 지도에는 영향 없음 */
+function addBasemap(m: Map) {
+  if (!BASEMAP_URL) return
+  try {
+    m.addSource(BASEMAP_SOURCE, { type: 'vector', url: BASEMAP_URL })
+    for (const layer of basemapLayers()) m.addLayer(layer, LAYER.mask)
+  } catch (e) {
+    console.error('[map] 배경 지도를 붙이지 못했습니다', e)
+  }
 }
 
 /** 배경 지도 켜기/끄기, 바깥 어둡게 */
@@ -328,7 +384,7 @@ function applyLook() {
 onMounted(() => {
   const m = new Map({
     container: container.value!,
-    style: createBaseStyle(true),
+    style: createBaseStyle(),
     center: [127.8, 36.2],
     zoom: 6,
     pitch: props.pitch,
@@ -350,6 +406,7 @@ onMounted(() => {
     m.addSource(SRC.labels, { type: 'geojson', data: EMPTY })
     for (const layer of createLayers(props.config, props.background.maskOpacity, props.effects.glow)) m.addLayer(layer)
     callouts = new CalloutManager(m)
+    addBasemap(m)
     applyBackground()
 
     m.on('move', liftLabels)
@@ -400,8 +457,56 @@ defineExpose({ map, geo, fitView, play, reset, showNow })
 </script>
 
 <style scoped>
-.map-view {
+.map-view,
+.map-canvas {
   position: absolute;
   inset: 0;
+}
+.peak-summary {
+  position: absolute;
+  top: 24px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+.peak-summary__box {
+  background: rgba(8, 11, 20, 0.9);
+  border: 1px solid var(--callout-color);
+  border-radius: 8px;
+  padding: 10px 20px 11px;
+  text-align: center;
+  max-width: min(720px, 100%);
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--callout-color) 50%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--callout-color) 16%, transparent);
+}
+.peak-summary__title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+.peak-summary__title svg {
+  color: var(--callout-color);
+}
+.peak-summary__names {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.summary-enter-active,
+.summary-leave-active {
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+.summary-enter-from,
+.summary-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

@@ -25,7 +25,7 @@ export interface SidoGeo {
 }
 
 /** 서버에서 받는 시군구별 값: "시도명 시군구명" → 퍼센트(0~100) */
-export type TurnoutInput = Record<string, number>
+export type RateInput = Record<string, number>
 
 /** 시도별 표현 설정 */
 export interface SidoConfig {
@@ -71,6 +71,8 @@ export interface EffectConfig {
   callout: boolean
   /** 100%가 없을 때 최고값 시군구에 말풍선 */
   calloutTopWhenNoPeak: boolean
-  /** 말풍선 부제 ({시도}, {시군구} 치환) */
+  /** 말풍선 부제 ({시도}, {시군구} 치환) — 100%가 1곳일 때 */
   calloutText: string
+  /** 100%가 여러 곳일 때 요약 박스 제목 ({시도}, {개수} 치환) */
+  summaryText: string
 }

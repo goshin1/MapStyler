@@ -153,8 +153,10 @@ export function createLayers(look: Look, maskOpacity = 0.35, glow = 0.7): LayerS
         'text-font': LABEL_FONT,
         'text-size': ['interpolate', ['linear'], ['zoom'], 8, 13, 11, 17],
         'text-line-height': 1.15,
-        'text-allow-overlap': true,
-        'text-ignore-placement': true,
+        // 100% 레이어가 위에 있어 일반 라벨보다 먼저 자리를 잡는다.
+        // 100%끼리 붙어 있을 때 겹치지 않도록 충돌 검사는 유지
+        'text-allow-overlap': false,
+        'text-padding': 1,
       },
       paint: {
         'text-color': '#ffffff',

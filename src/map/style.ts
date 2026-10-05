@@ -4,13 +4,16 @@ import type { ExpressionSpecification, LayerSpecification, StyleSpecification } 
  * 배경 지도(베이스맵) 스타일
  *
  * 타일 스키마: OpenMapTiles (OpenFreeMap, planetiler 출력 모두 동일)
- *  - 개발/스타일 작업: OpenFreeMap 공개 타일
- *  - 실사용(8단계)   : 직접 만든 PMTiles 파일로 교체 → .env 의 VITE_BASEMAP_URL 만 바꾸면 된다
+ *  - 기본(실사용): public/tiles/korea.pmtiles — 인터넷 없이 동작 (README 참고)
+ *  - 개발 중 파일이 없을 때: .env.local 에 VITE_BASEMAP_URL=https://tiles.openfreemap.org/planet
  *
  * glyphs URL을 두지 않으면 MapLibre가 라벨을 로컬 폰트로 그린다 → 외부 폰트 서버 불필요.
  * 배경 지도의 지명 라벨은 쓰지 않는다 (시군구 라벨만 표시).
  */
-export const BASEMAP_URL: string = import.meta.env.VITE_BASEMAP_URL ?? 'https://tiles.openfreemap.org/planet'
+const LOCAL_BASEMAP = `pmtiles://${new URL(`${import.meta.env.BASE_URL}tiles/korea.pmtiles`, location.href).href}`
+
+/** 배경 지도 URL. VITE_BASEMAP_URL 을 빈 값으로 두면 배경 지도 없이 단색 */
+export const BASEMAP_URL: string = import.meta.env.VITE_BASEMAP_URL ?? LOCAL_BASEMAP
 
 export const BASEMAP_SOURCE = 'basemap'
 
@@ -44,7 +47,7 @@ const width = (z8: number, z12: number, z16: number): ExpressionSpecification =>
 
 const notTunnel: ExpressionSpecification = ['!=', ['get', 'brunnel'], 'tunnel']
 
-function basemapLayers(): LayerSpecification[] {
+export function basemapLayers(): LayerSpecification[] {
   const c = BASEMAP_COLORS
   const src = BASEMAP_SOURCE
   return [
@@ -134,19 +137,21 @@ function basemapLayers(): LayerSpecification[] {
 /** 배경 지도 레이어 id (켜기/끄기용) */
 export const BASEMAP_LAYER_IDS = basemapLayers().map((l) => l.id)
 
-/** 전체 스타일. basemap=false 또는 URL이 비어 있으면 단색 배경만 */
-export function createBaseStyle(basemap = true): StyleSpecification {
-  const useBasemap = basemap && !!BASEMAP_URL
+/**
+ * 기본 스타일: 단색 배경만.
+ * 배경 지도는 지도 로드 후 addBasemap()으로 따로 붙인다
+ * → 배경 지도 파일이 없거나 깨져도 시군구 3D 지도는 정상 동작.
+ */
+export function createBaseStyle(): StyleSpecification {
   return {
     version: 8,
-    sources: useBasemap ? { [BASEMAP_SOURCE]: { type: 'vector', url: BASEMAP_URL } } : {},
+    sources: {},
     layers: [
       {
         id: 'background',
         type: 'background',
         paint: { 'background-color': BASEMAP_COLORS.background },
       },
-      ...(useBasemap ? basemapLayers() : []),
     ],
     light: {
       anchor: 'viewport',

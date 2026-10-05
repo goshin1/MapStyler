@@ -58,9 +58,9 @@
 import { computed, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import MapView from './components/MapView.vue'
 import MapRemocon, { type SidoIndex } from './components/MapRemocon.vue'
-import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, TurnoutInput } from './types'
+import type { AnimationConfig, BackgroundConfig, EffectConfig, SidoConfig, SidoGeo, RateInput } from './types'
 import { getSidoConfig } from './config/sido'
-import { mockTurnout, type MatchResult } from './composables/useTurnout'
+import { mockRates, type MatchResult } from './composables/useRingRate'
 import { DEFAULT_ANIMATION } from './map/animator'
 import { DEFAULT_EFFECTS } from './map/effects'
 
@@ -71,7 +71,7 @@ const animation = ref<AnimationConfig>({ ...DEFAULT_ANIMATION })
 const autoplay = ref(true)
 const background = ref<BackgroundConfig>({ basemap: true, maskOpacity: 0.35 })
 const effects = ref<EffectConfig>({ ...DEFAULT_EFFECTS })
-const values = ref<TurnoutInput>({})
+const values = ref<RateInput>({})
 const geo = shallowRef<SidoGeo>()
 const match = ref<MatchResult>()
 const mapView = useTemplateRef('mapView')
@@ -91,7 +91,7 @@ function onLoaded(g: SidoGeo) {
 }
 
 function randomize() {
-  if (geo.value) values.value = mockTurnout(geo.value)
+  if (geo.value) values.value = mockRates(geo.value)
 }
 
 onMounted(async () => {
